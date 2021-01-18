@@ -1,0 +1,34 @@
+Proyecto #hola
+{
+Entero x1=4,x7=3
+Decimal x13=2
+Imprimir("Introduce el valor de x1")
+
+Si(x1==3+5+9||x13<3&&x7>7&&x13>1)
+{
+Imprimir("Escribir en el para ")
+Entero x13
+
+x13=x13+9+9+8+5
+
+}Si_no
+{
+Entero cr,ew
+Para(cr=1,cr<3+5,cr++) 
+{
+Decimal x1=9+3
+ew=66
+ew=ew+5+(9*8)
+Imprimir ("Estoy en el para "+cr)
+}
+x7=x7+1
+Imprimir("El valor es "+x7)
+cr=cr+1
+}
+
+Met @hola
+{
+Imprimir("hola")
+}
+x13=x13+1.0
+}
