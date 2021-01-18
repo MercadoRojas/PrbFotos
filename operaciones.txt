@@ -1,0 +1,272 @@
+jmp main  ; este siempre debe estar
+
+//F1: .db 7, 4, 1,'o'
+//F2: .db 8, 5, 2, 0
+//F3: .db 9, 6, 3,'='
+//F4: .db '/', '*', '-', '+'
+	.def LCD_on=r0
+	.def	data = r17 //r16 me sirve para escribir un dato, con esta definicion
+	.def	rstl = r0 //rst = resultado	parte baja 
+	.def	rsth = r1 //rst = resultado parte alta del registro 
+	.def	operacion =r20
+	.def	num1=r21
+	.def	cont=r22
+	
+	.macro div
+	inc cont
+	sub @0,@1
+	.endmacro 
+	
+	.macro	sep
+		ldi	r16, @1
+		out	@0, r16
+	.endmacro
+
+	;dato o direccion de la operacion 
+F1: .db '7','4', '1', 0x01
+F2: .db '8', '5', '2', 0X30
+F3: .db '9', '6', '3','='
+F4: .db '/', '*', '-', '+'
+	
+;	.include "_LCD.inc"
+
+
+main: ; aqui va a comenzar el programa
+
+	;ldi r16, 0xf0; la parte baja es lectura
+	;out DDRD, R16
+	sep	DDRD, 0xf0
+	;ldi r16, 0xFF
+	;out DDRC, r16
+	sep	DDRC, 0xff
+	;clr r0
+;.ifdef  LCD_on ; con esta instruccion se ignoran las instrucciones
+;	rcall LCD_INIT	//Rutina para llamar al LCD
+;.endif
+
+;ldi	r30, low(MSG << 1) //MSG es la constante que tiene 'Hola mundo'
+;ldi	r31, high(MSG)	//Esto es para el puntero 'Z' (guardo la rutina)
+
+
+loop:
+	;rcall retardo_4ms
+	
+	rcall ebarrido
+	cpi	data, 0
+	breq sig	//Si es igual data a 0, brinca a sig.
+
+	rcall datoIng
+	;clr	data //se limpia para que no regrese al ciclo. 
+sig:  
+	rjmp loop
+
+lim:
+	;rcall limpiar ;Metodo de LCD
+	clr data
+	clr rstl
+	clr rsth
+	clr num1
+	clr cont
+	rjmp loop
+
+datoIng: //antes de guardar el dato, se compara si se apreto un signo, si se aprieta signo, ignoralo, dato
+	mov r16, data
+	;si se presiono la tecla on entonces limpia´pantalla 
+	cpi r16, 0x01	;Se pone un valor ASCII para el ON
+	breq lim
+	;Si no presiono la tecla on reesta a r17 30 pnoe el codigo ascii
+
+	subi data, 0x30 //Comparamos si esta entre 0x30 o 0x39 (codigos del 0 al 9) y se combierte a decimal
+	;compararacion para dato y operacion
+	;cpi num1,1
+	;brsh copiado
+	cpi data, 0x0A	//comparamos con el numero mayor (si es mayor o igual a 10) brinca...
+	brlo numero	;brinca si es menor
+	cpi data, 0x0A
+	brsh opera
+ret
+
+imprimir:
+	
+;	rcall	DATAWRT
+	clr		r17
+	ret
+   
+opera:
+	cpi operacion,0x00
+	breq  op
+	ldi r16,0x30
+	add	r16,r17
+	jmp imprimir
+	cpi operacion, '+'
+	breq suma ;imprimir// si no es igual, imprime, si es igual clr r20
+	cpi	operacion,'-'
+	breq resta
+	cpi operacion, '*'
+	breq multiplicacion
+	cpi operacion, '/'
+	breq divi
+	ret
+op:
+	add num1,rstl
+	mov	operacion,r16
+	clr rstl
+	ret
+suma:
+	add rstl,num1
+	;jmp conversion
+	ret
+resta:
+	sub num1,rstl
+	mov rstl,num1
+	;jmp conversion
+	ret
+multiplicacion:
+	mul rstl, num1
+	;jmp conversion
+	ret
+divi:
+
+	cp num1,rstl
+	brsh di
+	brlo res
+	ret
+di:
+	inc cont 
+	sub num1,rstl
+	jmp divi
+
+res:
+	MOV rstl,cont	
+	;jmp conversion 
+	ret
+igual:
+	jmp conversion
+	;call lim
+	ret
+numero:	
+	ldi	r16,0x0A
+	mul rstl,r16
+	;mov num1,r0
+	add	rstl,r17
+	ldi	r16,0x30
+	add	r16,r17
+	;mov	r16,num1
+	rjmp	imprimir
+	ret
+conversion:
+	clr cont
+	ldi	r16,0b01100100
+	cp rstl,r16
+	brsh  centena
+	ldi	r16,0x0a
+	cp  rstl,r16
+	brsh  decena
+	ldi	r16,0x0a
+	cp  rstl,r16
+	brlo  unidad
+ret
+unidad:
+	ldi	r16,0x30
+	add r16,rstl
+	jmp imprimir
+	ret
+centena:
+	div rstl,r16
+	cp rstl,r16
+	brsh  centena
+	brlo  imp
+	
+	
+decena:
+	div	rstl,r16
+	cp rstl,r16
+	brsh  decena
+	cp rstl,r16
+	brlo  imp
+	;brlo	unidad
+	;rcall	imprimir
+	ret
+imp:
+	ldi r16,0x30
+	add r16,cont
+	call imprimir
+	clr cont
+	jmp conversion
+retardo_4ms:
+	ldi r18, 0xFF	//Necesito un ajuste fino, 2.9 -> 3.0 
+clkrn1: 
+	ldi r16, 0x0FF	//para 1.5 -> 3.0 se usa este 
+clkrn2:
+	nop 
+	nop
+	dec r16
+	cpi r16, 0x00
+	brne clkrn2
+	dec r18
+	cpi r18, 0x00
+	brne clkrn1
+	;clr data
+	ret
+
+
+ebarrido:
+;punteros
+	ldi r16,  0b11101111
+	out PORTD, r16
+	ldi r31, high(F1)
+	ldi r30, low(F1 << 1)
+rcall barrido
+
+	ldi r16, 0b11011111
+	out PORTD, r16
+	ldi r31, high(F2)
+	ldi r30, low(F2 << 1)
+rcall barrido
+
+	ldi r16, 0b10111111
+	out PORTD, r16
+	ldi r31, high(F3)
+	ldi r30, low(F3 << 1)
+rcall barrido
+
+	ldi r16, 0b01111111
+	out PORTD, r16
+	ldi r31, high(F4)
+	ldi r30, low(F4 << 1)
+	rcall barrido
+ 
+ret ; el rjmp regresa los espacios que indique
+
+barrido:
+	clr r2
+	in r16, PIND
+	andi r16, 0x0F
+	inc r2;sirve para saber cuando se genero la interrupcion
+	cpi r16, 0B1110 ;Aqui solo compara
+	breq direFila
+
+	inc r2
+	cpi r16, 0b1101
+	breq direFila
+
+	inc r2
+	cpi r16, 0b1011
+	breq direFila
+
+	inc r2
+	cpi r16, 0b0111
+	breq direFila
+
+ret
+
+direFila: //Esto nos dice cuato nos tenemos que mover 'para puchar el 7 EJEMPLO'
+;rcall limpiar //par alimpiar la pantalla (variable en LCD) 
+	dec r2
+	clr r3
+	lpm data, Z+ ; con esto se usa el puntero, solo con Z
+	cp r2, r3
+	brne direFila
+	;rcall retardo_4ms
+;rcall DATAWRT //En teoria deberia escribir el 1,2,3,4,5,6,7,8... DEBEMOS REEMPLZAR LOS VALORES DE ARRIBA CON CODIGO ASCII ;out PORTC, r16
+	ret
